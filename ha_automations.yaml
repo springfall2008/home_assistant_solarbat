@@ -1,0 +1,653 @@
+- id: '1676651399002'
+  alias: Load Battery Soc Target from Home Requirement
+  description: ''
+  trigger:
+  - platform: time
+    at: input_datetime.home_battery_trigger_time
+  condition: []
+  action:
+  - service: number.set_value
+    data:
+      value: '{% set percent = states(''sensor.home_battery_charge_to_percent'') |
+        float %} {{percent}}
+
+        '
+    target:
+      entity_id: number.givtcp_saXXXXXXX_target_soc
+  - service: notify.notify
+    data:
+      message: New SOC has been loaded into home battery
+  mode: single
+- id: '1676740205473'
+  alias: 'Home Battery reset SOC target '
+  description: ''
+  trigger:
+  - platform: time
+    at: input_datetime.home_battery_reset_time
+  condition: []
+  action:
+  - service: number.set_value
+    data:
+      value: '100'
+    target:
+      entity_id: number.givtcp_saXXXXXXX_target_soc
+  - delay:
+      hours: 0
+      minutes: 3
+      seconds: 0
+      milliseconds: 0
+  - service: number.set_value
+    data:
+      value: '100'
+    target:
+      entity_id: number.givtcp_saXXXXXXX_target_soc
+  mode: single
+- id: '1676979630705'
+  alias: Reset home battery charge time daily
+  description: ''
+  trigger:
+  - platform: time
+    at: '20:00:00'
+  condition: []
+  action:
+  - service: select.select_option
+    data:
+      option: '{% set opt = states(''input_datetime.home_battery_charge_start'') %}
+        {{opt}} '
+    target:
+      entity_id: select.givtcp_saXXXXXXX_charge_start_time_slot_1
+    enabled: true
+  - delay:
+      hours: 0
+      minutes: 2
+      seconds: 20
+      milliseconds: 0
+  - service: select.select_option
+    data:
+      option: '{% set opt = states(''input_datetime.home_battery_charge_end'') %}
+        {{opt}} '
+    target:
+      entity_id: select.givtcp_saXXXXXXX_charge_end_time_slot_1
+  mode: single
+- id: '1678800377937'
+  alias: Charge car from solar - start
+  description: ''
+  trigger:
+  - platform: numeric_state
+    entity_id: sensor.givtcp_saXXXXXXX_soc
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    above: input_number.wallbox_solar_soc
+  - platform: time_pattern
+    minutes: /3
+  condition:
+  - condition: and
+    conditions:
+    - condition: time
+      after: input_datetime.wallbox_solar_start_time
+      before: input_datetime.wallbox_solar_end_time
+    - type: is_plugged_in
+      condition: device
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: binary_sensor.tsunami_charger
+      domain: binary_sensor
+    - condition: state
+      state: 'on'
+      entity_id: input_boolean.wallbox_solar
+    - condition: state
+      entity_id: input_boolean.wallbox_solar_running
+      state: 'off'
+    - condition: numeric_state
+      entity_id: sensor.givtcp_saXXXXXXX_soc
+      above: input_number.wallbox_solar_soc
+    - condition: numeric_state
+      entity_id: sensor.givtcp_saXXXXXXX_battery_power
+      below: 100
+    - condition: numeric_state
+      entity_id: sensor.wallbox_portal_charging_power
+      below: 1
+    - condition: state
+      entity_id: input_boolean.octopus_slot_triggered
+      state: 'off'
+  action:
+  - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    domain: button
+    entity_id: button.tsunami_wake_up
+    type: press
+  - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    domain: number
+    entity_id: number.tsunami_charge_limit
+    type: set_value
+    value: 100
+  - type: turn_off
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: switch.octopus_smart_charging
+    domain: switch
+  - service: number.set_value
+    data:
+      value: '{% set percent = states(''input_number.wallbox_solar_charge_rate'')
+        | int %} {{percent}}
+
+        '
+    target:
+      entity_id: number.wallbox_portal_max_charging_current
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 10
+      milliseconds: 0
+  - type: turn_on
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: switch.wallbox_portal_pause_resume
+    domain: switch
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 10
+      milliseconds: 0
+  - if:
+    - condition: device
+      type: is_off
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.tsunami_charger
+      domain: switch
+    then:
+    - type: turn_on
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.tsunami_charger
+      domain: switch
+  - service: input_boolean.turn_on
+    data: {}
+    target:
+      entity_id: input_boolean.wallbox_solar_running
+  - service: notify.notify
+    data:
+      message: Car has started charging from solar
+  mode: single
+- id: '1678800783408'
+  alias: Charge car from solar - stop
+  description: ''
+  trigger:
+  - platform: numeric_state
+    entity_id: sensor.givtcp_saXXXXXXX_soc
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+    below: input_number.wallbox_solar_soc
+  - platform: state
+    entity_id:
+    - input_boolean.wallbox_solar
+    from: 'on'
+    to: 'off'
+  - platform: time_pattern
+    minutes: /5
+  - platform: numeric_state
+    entity_id: sensor.givtcp_saXXXXXXX_import_power
+    for:
+      hours: 0
+      minutes: 3
+      seconds: 0
+    above: 200
+  condition:
+  - condition: and
+    conditions:
+    - condition: device
+      type: is_on
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.wallbox_portal_pause_resume
+      domain: switch
+    - condition: device
+      type: is_on
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.tsunami_charger
+      domain: switch
+    - condition: state
+      state: 'on'
+      entity_id: input_boolean.wallbox_solar_running
+    - condition: or
+      conditions:
+      - condition: state
+        entity_id: input_boolean.wallbox_solar
+        state: 'off'
+      - condition: numeric_state
+        entity_id: sensor.givtcp_saXXXXXXX_soc
+        below: input_number.wallbox_solar_soc
+      - condition: numeric_state
+        entity_id: sensor.givtcp_saXXXXXXX_import_power
+        above: 100
+  action:
+  - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    domain: button
+    entity_id: button.tsunami_wake_up
+    type: press
+  - type: turn_off
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: switch.wallbox_portal_pause_resume
+    domain: switch
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 10
+      milliseconds: 0
+  - type: turn_on
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: switch.octopus_smart_charging
+    domain: switch
+  - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    domain: number
+    entity_id: number.wallbox_portal_max_charging_current
+    type: set_value
+    value: 32
+  - service: input_boolean.turn_off
+    data: {}
+    target:
+      entity_id: input_boolean.wallbox_solar_running
+  - service: notify.notify
+    data:
+      message: Car has stopped charging from solar
+  mode: single
+- id: '1678807210913'
+  alias: Wallbox solar - tidy up
+  description: If the charging stopped by other means then tidy up
+  trigger:
+  - platform: time_pattern
+    minutes: /6
+  condition:
+  - condition: state
+    entity_id: input_boolean.wallbox_solar_running
+    state: 'on'
+    for:
+      hours: 0
+      minutes: 10
+      seconds: 0
+  - condition: or
+    conditions:
+    - condition: device
+      type: is_off
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.tsunami_charger
+      domain: switch
+      for:
+        hours: 0
+        minutes: 5
+        seconds: 0
+    - condition: device
+      type: is_off
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.wallbox_portal_pause_resume
+      domain: switch
+      for:
+        hours: 0
+        minutes: 5
+        seconds: 0
+    - type: is_not_plugged_in
+      condition: device
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: binary_sensor.tsunami_charger
+      domain: binary_sensor
+      for:
+        hours: 0
+        minutes: 5
+        seconds: 0
+  action:
+  - service: input_boolean.turn_off
+    data: {}
+    target:
+      entity_id: input_boolean.wallbox_solar_running
+  - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    domain: number
+    entity_id: number.wallbox_portal_max_charging_current
+    type: set_value
+    value: 32
+  - type: turn_off
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: switch.wallbox_portal_pause_resume
+    domain: switch
+  - service: notify.notify
+    data:
+      message: Car has aborted charging from solar
+  - type: turn_on
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: switch.octopus_smart_charging
+    domain: switch
+  mode: single
+- id: '1679403742559'
+  alias: Home battery fully charged
+  description: ''
+  trigger:
+  - platform: numeric_state
+    entity_id: sensor.givtcp_saXXXXXXX_soc
+    above: 99
+  condition: []
+  action:
+  - service: notify.notify
+    data:
+      message: Home Battery is fully charged
+  mode: single
+- id: '1679404241933'
+  alias: Tune Wallbox current
+  description: ''
+  trigger:
+  - platform: time_pattern
+    minutes: /5
+  condition:
+  - condition: state
+    entity_id: input_boolean.wallbox_solar_running
+    state: 'on'
+  action:
+  - if:
+    - condition: numeric_state
+      entity_id: sensor.givtcp_saXXXXXXX_export_power
+      above: 500
+    then:
+    - if:
+      - type: is_current
+        condition: device
+        device_id: xxxxxxxxxxxxxxxxxxxxxxx
+        entity_id: sensor.wallbox_portal_max_charging_current
+        domain: sensor
+        below: 8
+      then:
+      - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+        domain: number
+        entity_id: number.wallbox_portal_max_charging_current
+        type: set_value
+        value: 8
+    else:
+    - if:
+      - condition: numeric_state
+        entity_id: sensor.givtcp_saXXXXXXX_import_power
+        above: 100
+      then:
+      - if:
+        - type: is_current
+          condition: device
+          device_id: xxxxxxxxxxxxxxxxxxxxxxx
+          entity_id: sensor.wallbox_portal_max_charging_current
+          domain: sensor
+          above: 6
+        then:
+        - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+          domain: number
+          entity_id: number.wallbox_portal_max_charging_current
+          type: set_value
+          value: 6
+  mode: single
+- id: '1679511910381'
+  alias: Car charge in octopus slot - backup
+  description: ''
+  trigger:
+  - platform: state
+    entity_id:
+    - binary_sensor.octopus_intelligent_planned_dispatch_slot
+    to: 'on'
+    from: 'off'
+  - platform: time_pattern
+    minutes: /5
+  condition:
+  - condition: state
+    entity_id: input_boolean.wallbox_solar_running
+    state: 'off'
+  - condition: state
+    entity_id: binary_sensor.octopus_intelligent_planned_dispatch_slot
+    state: 'on'
+    for:
+      hours: 0
+      minutes: 5
+      seconds: 0
+  - condition: time
+    after: input_datetime.wallbox_solar_end_time
+    before: input_datetime.wallbox_solar_start_time
+  - type: is_not_charging
+    condition: device
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: binary_sensor.tsunami_charging
+    domain: binary_sensor
+    for:
+      hours: 0
+      minutes: 10
+      seconds: 0
+  - type: is_plugged_in
+    condition: device
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: binary_sensor.tsunami_charger
+    domain: binary_sensor
+  action:
+  - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    domain: button
+    entity_id: button.tsunami_wake_up
+    type: press
+  - delay:
+      hours: 0
+      minutes: 2
+      seconds: 0
+      milliseconds: 0
+  - if:
+    - condition: and
+      conditions:
+      - condition: device
+        type: is_off
+        device_id: xxxxxxxxxxxxxxxxxxxxxxx
+        entity_id: switch.wallbox_portal_pause_resume
+        domain: switch
+    then:
+    - type: turn_on
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.wallbox_portal_pause_resume
+      domain: switch
+    - service: input_boolean.turn_off
+      data: {}
+      target:
+        entity_id: input_boolean.wallbox_had_override
+    - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      domain: number
+      entity_id: number.wallbox_portal_max_charging_current
+      type: set_value
+      value: 32
+  - delay:
+      hours: 0
+      minutes: 1
+      seconds: 0
+      milliseconds: 0
+  - if:
+    - type: is_not_charging
+      condition: device
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: binary_sensor.tsunami_charging
+      domain: binary_sensor
+    then:
+    - type: turn_on
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.tsunami_charger
+      domain: switch
+  - service: notify.notify
+    data:
+      message: Started car charging - backup
+  mode: single
+- id: '1679513541757'
+  alias: Octopus slot - ON
+  description: ''
+  trigger:
+  - platform: state
+    entity_id:
+    - binary_sensor.octopus_intelligent_slot
+    to: 'on'
+  - platform: time_pattern
+    minutes: /5
+  condition:
+  - condition: state
+    entity_id: binary_sensor.octopus_intelligent_slot
+    state: 'on'
+  - condition: state
+    entity_id: input_boolean.wallbox_solar_running
+    state: 'off'
+  - condition: or
+    conditions:
+    - condition: time
+      after: input_datetime.wallbox_solar_end_time
+      before: input_datetime.wallbox_solar_start_time
+    - condition: state
+      entity_id: input_boolean.wallbox_solar
+      state: 'off'
+  - condition: state
+    entity_id: input_boolean.octopus_slot_triggered
+    state: 'off'
+  - condition: state
+    entity_id: binary_sensor.tsunami_charger
+    state: 'on'
+  action:
+  - service: number.set_value
+    data:
+      value: '0'
+    target:
+      entity_id: number.givtcp_saXXXXXXX_battery_discharge_rate
+  - delay:
+      hours: 0
+      minutes: 1
+      seconds: 0
+      milliseconds: 0
+  - service: number.set_value
+    data:
+      value: '0'
+    target:
+      entity_id: number.givtcp_saXXXXXXX_battery_discharge_rate
+  - if:
+    - condition: device
+      type: is_off
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.wallbox_portal_pause_resume
+      domain: switch
+    then:
+    - type: turn_on
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.wallbox_portal_pause_resume
+      domain: switch
+    - device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      domain: number
+      entity_id: number.wallbox_portal_max_charging_current
+      type: set_value
+      value: 32
+  - service: input_boolean.turn_on
+    data: {}
+    target:
+      entity_id: input_boolean.octopus_slot_triggered
+  - service: notify.notify
+    data:
+      message: Octopus Slot - ON
+  mode: single
+- id: '1679514161006'
+  alias: Ocotpus Slot - OFF
+  description: ''
+  trigger:
+  - platform: state
+    entity_id:
+    - binary_sensor.octopus_intelligent_slot
+    to: 'off'
+  - platform: time_pattern
+    minutes: /5
+  condition:
+  - condition: state
+    entity_id: binary_sensor.octopus_intelligent_slot
+    state: 'off'
+  - condition: state
+    entity_id: input_boolean.octopus_slot_triggered
+    state: 'on'
+  action:
+  - service: number.set_value
+    data:
+      value: '2600'
+    target:
+      entity_id: number.givtcp_saXXXXXXX_battery_discharge_rate
+  - delay:
+      hours: 0
+      minutes: 1
+      seconds: 0
+      milliseconds: 0
+  - service: number.set_value
+    data:
+      value: '2600'
+    target:
+      entity_id: number.givtcp_saXXXXXXX_battery_discharge_rate
+  - if:
+    - condition: device
+      type: is_on
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.wallbox_portal_pause_resume
+      domain: switch
+    then:
+    - type: turn_off
+      device_id: xxxxxxxxxxxxxxxxxxxxxxx
+      entity_id: switch.wallbox_portal_pause_resume
+      domain: switch
+  - service: input_boolean.turn_off
+    data: {}
+    target:
+      entity_id: input_boolean.octopus_slot_triggered
+  - service: notify.notify
+    data:
+      message: Octopus slot OFF
+  mode: single
+- id: '1679649979894'
+  alias: Solcast update
+  description: ''
+  trigger:
+  - platform: sun
+    event: sunrise
+    offset: 0
+  - platform: sun
+    event: sunset
+    offset: 0
+  - platform: time
+    at: '22:00:00'
+  condition: []
+  action:
+  - service: solcast_solar.update_forecasts
+    data: {}
+  mode: single
+- id: '1679836895687'
+  alias: Log wallbox override
+  description: ''
+  trigger:
+  - platform: device
+    type: turned_off
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: switch.wallbox_portal_pause_resume
+    domain: switch
+  condition:
+  - type: is_plugged_in
+    condition: device
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: binary_sensor.tsunami_charger
+    domain: binary_sensor
+  action:
+  - service: input_boolean.turn_on
+    data: {}
+    target:
+      entity_id: input_boolean.wallbox_had_override
+  mode: single
+- id: '1679836978979'
+  alias: Wallbox override reset
+  description: ''
+  trigger:
+  - type: not_plugged_in
+    platform: device
+    device_id: xxxxxxxxxxxxxxxxxxxxxxx
+    entity_id: binary_sensor.tsunami_charger
+    domain: binary_sensor
+    for:
+      hours: 0
+      minutes: 1
+      seconds: 0
+  condition:
+  - condition: state
+    entity_id: input_boolean.wallbox_had_override
+    state: 'on'
+  action:
+  - service: input_boolean.turn_off
+    data: {}
+    target:
+      entity_id: input_boolean.wallbox_had_override
+  mode: single

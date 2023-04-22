@@ -1,0 +1,143 @@
+input_number:
+    home_daily_energy_use:
+      name: "Home Daily Energy Use (with margin)"
+      min: 0
+      max: 20
+      step: 1
+      unit_of_measurement: "kwh"
+  
+    home_minimum_charge_amount:
+      name: "Home Minimum charge amount"
+      min: 0
+      max: 10
+      step: 0.5
+      unit_of_measurement: "kwh"
+      
+    wallbox_solar_soc:
+      name: "Wallbox Solar - Trigger SOC"
+      min: 5
+      max: 100
+      step: 1
+      unit_of_measurement: "%"
+      
+    wallbox_solar_charge_rate:
+      min: 6
+      max: 15
+      step: 1
+      unit_of_measurement: "amps"
+  
+  input_datetime:
+    home_battery_trigger_time:
+      name: "Home battery update target SOC time"
+      has_date: false
+      has_time: true
+      
+    home_battery_reset_time:
+      name: "Home battery reset target SOC time"
+      has_date: false
+      has_time: true
+      
+    wallbox_solar_start_time:
+      name: "Wallbox solar - automation start time"
+      has_date: false
+      has_time: true
+      
+    wallbox_solar_end_time:
+      name: "Wallbox solar - automation end time"
+      has_date: false
+      has_time: true
+  
+    home_battery_charge_start:
+      name: "Home battery start charging time"
+      has_date: false
+      has_time: true
+      
+    home_battery_charge_end:
+      name: "Home battery end charging time"
+      has_date: false
+      has_time: true
+      
+  
+  input_boolean:
+    wallbox_solar:
+      name: "Wallbox Solar - Enable"
+      
+    wallbox_solar_running:
+      name: "Wallbox Solar - Automation is running"
+      
+    wallbox_had_override:
+      name: "Wallbox - has been overridden"
+  
+    octopus_slot_triggered:
+      name: "Ocotpus slot start automation has triggered"
+  
+  template:
+    - sensor:
+        - name: "solar_forecast_combined_now"
+          unit_of_measurement: "watts"
+          state_class: measurement
+          state: >
+            {% set north = states('sensor.power_production_now') | float %}
+            {% set south = states('sensor.power_production_now_2') | float %}
+  
+            {{ (north + south) }}
+            
+        - name: "solar_forecast_tomorrow"
+          unit_of_measurement: "kwh"
+          state_class: measurement
+          state: >
+            {% set north = states('sensor.energy_production_tomorrow') | float %}
+            {% set south = states('sensor.energy_production_tomorrow_2') | float %}
+  
+            {{ (north + south) }}
+            
+        - name: "solar_solcast_sel_tomorrow"
+          unit_of_measurement: "kwh"
+          state_class: measurement
+          state: >
+            {% set solcast = states('sensor.solcast_forecast_tomorrow') | float %}
+  
+            {{ (solcast) }}
+            
+        - name: "home_energy_in_today"
+          unit_of_measurement: "kwh"
+          state_class: measurement
+          state: >
+            {% set solar = states('sensor.givtcp_saXXXXXXX_pv_energy_today_kwh') | float %}
+            {% set battery = states('sensor.givtcp_saXXXXXXX_battery_discharge_energy_today_kwh') | float %}
+  
+            {{ ((solar + battery) |round(2)) }}
+            
+        - name: "home_battery_spare_tomorrow"
+          unit_of_measurement: "kwh"
+          state_class: measurement
+          state: >
+            {% set solar = states('sensor.solar_solcast_sel_tomorrow') | float %}
+            {% set usage = states('input_number.home_daily_energy_use') | float %}
+            {% set battery = states('sensor.givtcp_saXXXXXXX_battery_capacity_kwh') | float %}
+  
+            {{ ((battery + solar - usage) |round(2)) }}
+            
+        - name: "home_battery_charge_to_kwh"
+          unit_of_measurement: "kwh"
+          state_class: measurement
+          state: >
+            {% set spare = states('sensor.home_battery_spare_tomorrow') | float %}
+            {% set battery = states('sensor.givtcp_saXXXXXXX_battery_capacity_kwh') | float %}
+            {% set min_charge = states('input_number.home_minimum_charge_amount') | float %}
+            {% macro min(X, Y) -%} {{ X if X|float < Y|float else Y }} {%- endmacro %}
+            {% macro max(X, Y) -%} {{ X if X|float > Y|float else Y }} {%- endmacro %}
+                  
+            {{ (min(max(min_charge, battery - spare), battery) |round(2))  }}
+            
+        - name: "home_battery_charge_to_percent"
+          unit_of_measurement: "%"
+          state_class: measurement
+          state: >
+            {% set charge = states('sensor.home_battery_charge_to_kwh') | float %}
+            {% set battery = states('sensor.givtcp_saXXXXXXX_battery_capacity_kwh') | float %}
+            
+            {{ ((charge / battery * 100.0) |round(0)) }}
+  
+  
+  
