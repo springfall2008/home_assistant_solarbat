@@ -1,6 +1,8 @@
 # home_assistant_solarbat
 Automation examples for Home Assistant with Wallbox, Givenergy and Tesla
 
+*** NOTE: The battery automation has been replaced with https://github.com/springfall2008/batpred ***
+
 The code in ha_automations.yml can go into automations.yml and the code in ha_configuration.yml goes into configuration.yml
 
 This will not work out of the box, at the very least you need to fill in the xxxxx with your device names/IDs
