@@ -1,4 +1,7 @@
 input_number:
+# --------------------------
+# Home battery automation
+# --------------------------
     home_daily_energy_use:
       name: "Home Daily Energy Use (with margin)"
       min: 0
@@ -13,6 +16,9 @@ input_number:
       step: 0.5
       unit_of_measurement: "kwh"
       
+# --------------------------
+# Solar charging automation
+# --------------------------
     wallbox_solar_soc:
       name: "Wallbox Solar - Trigger SOC"
       min: 5
@@ -25,7 +31,10 @@ input_number:
       max: 15
       step: 1
       unit_of_measurement: "amps"
-  
+# --------------------------
+# Home battery automation 
+# --------------------------
+
   input_datetime:
     home_battery_trigger_time:
       name: "Home battery update target SOC time"
@@ -36,7 +45,10 @@ input_number:
       name: "Home battery reset target SOC time"
       has_date: false
       has_time: true
-      
+# --------------------------
+# Solar charging automation
+# --------------------------
+
     wallbox_solar_start_time:
       name: "Wallbox solar - automation start time"
       has_date: false
@@ -46,7 +58,9 @@ input_number:
       name: "Wallbox solar - automation end time"
       has_date: false
       has_time: true
-  
+# --------------------------
+#  Home battery automation
+# --------------------------
     home_battery_charge_start:
       name: "Home battery start charging time"
       has_date: false
@@ -56,8 +70,11 @@ input_number:
       name: "Home battery end charging time"
       has_date: false
       has_time: true
-      
-  
+
+# --------------------------
+# Solar charging automation
+# --------------------------
+
   input_boolean:
     wallbox_solar:
       name: "Wallbox Solar - Enable"
@@ -70,7 +87,10 @@ input_number:
   
     octopus_slot_triggered:
       name: "Ocotpus slot start automation has triggered"
-  
+# --------------------------
+# Home battery automation
+# --------------------------
+
   template:
     - sensor:
         - name: "solar_forecast_combined_now"
